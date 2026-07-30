@@ -118,6 +118,8 @@
   .listbtn{font:inherit;font-size:12px;background:#fff;border:1px solid var(--line2);
     border-radius:8px;padding:5px 12px;cursor:pointer;color:var(--indigo);margin-bottom:12px}
   .listbtn:hover{border-color:var(--indigo)}
+  .xlsrow{display:flex;gap:8px;margin-top:8px}
+  .xlsrow .listbtn{margin-bottom:0}
   .pubpanel{border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:14px;background:var(--field)}
   .pubsearch{width:100%;font-family:var(--mono);font-size:13px;border:1px solid var(--line2);
     border-radius:8px;padding:8px 10px;background:#fff}
@@ -157,6 +159,11 @@
           <input id="blNew" type="text" placeholder="차단할 단어 추가" autocomplete="off">
           <button class="add" id="blAdd">추가</button>
         </div>
+        <div class="xlsrow">
+          <button class="listbtn" id="blDownload">엑셀 다운로드</button>
+          <button class="listbtn" id="blUpload">엑셀 업로드</button>
+          <input type="file" id="blFile" accept=".xlsx,.xls,.csv" hidden>
+        </div>
         <input id="blSearch" class="pubsearch" placeholder="블랙리스트 검색…" autocomplete="off" style="margin-top:8px">
         <div id="blList" class="publist" style="margin-top:8px"></div>
 
@@ -164,6 +171,11 @@
         <div class="lexadd">
           <input id="wlNew" type="text" placeholder="예외 단어 추가 (예: 시발점)" autocomplete="off">
           <button class="add" id="wlAdd">추가</button>
+        </div>
+        <div class="xlsrow">
+          <button class="listbtn" id="wlDownload">엑셀 다운로드</button>
+          <button class="listbtn" id="wlUpload">엑셀 업로드</button>
+          <input type="file" id="wlFile" accept=".xlsx,.xls,.csv" hidden>
         </div>
         <input id="wlSearch" class="pubsearch" placeholder="화이트리스트 검색…" autocomplete="off" style="margin-top:8px">
         <div id="wlList" class="publist" style="margin-top:8px;max-height:150px"></div>
@@ -195,6 +207,7 @@
   </p>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script>
 /* ─────────────────────────────────────────────────────────
    파이썬 규칙 로직(normalizer.py + filter_engine.py) 이식
@@ -452,6 +465,70 @@ async function loadDicts(){
   for(const w of bag){ if(w&&!seen.has(w)){seen.add(w);BL_DEFAULT.push(w);} }
   buildLex();renderBlacklist();render();
 }
+
+// ── 엑셀 다운로드 / 업로드 ──
+function pad2(n){return String(n).padStart(2,"0");}
+function dateStamp(){const d=new Date();return `${d.getFullYear()}${pad2(d.getMonth()+1)}${pad2(d.getDate())}`;}
+function downloadWords(words,label){
+  if(typeof XLSX==="undefined"){alert("엑셀 모듈을 불러오지 못했습니다. 네트워크 연결을 확인해 주세요.");return;}
+  const aoa=[[label]].concat(words.map(w=>[w]));
+  const ws=XLSX.utils.aoa_to_sheet(aoa);
+  ws["!cols"]=[{wch:24}];
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,label);
+  XLSX.writeFile(wb,`${label}_${dateStamp()}.xlsx`);
+}
+function wordsFromSheet(aoa,headerLabels){
+  const out=[],seen=new Set();
+  for(const row of aoa){
+    if(!row||!row.length)continue;
+    const cell=row[0];
+    if(cell==null)continue;
+    const w=String(cell).trim();
+    if(!w||headerLabels.includes(w)||seen.has(w))continue;
+    seen.add(w);out.push(w);
+  }
+  return out;
+}
+function readWordsFromFile(file,headerLabels,done){
+  if(typeof XLSX==="undefined"){alert("엑셀 모듈을 불러오지 못했습니다. 네트워크 연결을 확인해 주세요.");return;}
+  const reader=new FileReader();
+  reader.onload=e=>{
+    try{
+      const wb=XLSX.read(new Uint8Array(e.target.result),{type:"array"});
+      const ws=wb.Sheets[wb.SheetNames[0]];
+      const aoa=XLSX.utils.sheet_to_json(ws,{header:1,blankrows:false});
+      done(wordsFromSheet(aoa,headerLabels));
+    }catch(err){alert("엑셀 파일을 읽지 못했습니다: "+err.message);}
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+// 블랙리스트 다운로드/업로드 (현재 리스트 → 파일, 파일 → 리스트 전체 교체)
+document.getElementById("blDownload").onclick=()=>downloadWords(BL_WORDS,"블랙리스트");
+document.getElementById("blUpload").onclick=()=>document.getElementById("blFile").click();
+document.getElementById("blFile").addEventListener("change",e=>{
+  const f=e.target.files[0]; if(!f)return;
+  readWordsFromFile(f,["블랙리스트","단어","word"],words=>{
+    BL_DEFAULT=[];BL_REMOVED.clear();BL_CUSTOM=words.slice();
+    buildLex();renderBlacklist();render();
+    alert(`블랙리스트를 업로드한 ${words.length.toLocaleString()}개 단어로 교체했습니다.`);
+  });
+  e.target.value="";
+});
+
+// 화이트리스트 다운로드/업로드
+document.getElementById("wlDownload").onclick=()=>downloadWords(WHITELIST,"화이트리스트");
+document.getElementById("wlUpload").onclick=()=>document.getElementById("wlFile").click();
+document.getElementById("wlFile").addEventListener("change",e=>{
+  const f=e.target.files[0]; if(!f)return;
+  readWordsFromFile(f,["화이트리스트","단어","word"],words=>{
+    WHITELIST=words.slice();
+    renderWhitelist();render();
+    alert(`화이트리스트를 업로드한 ${words.length.toLocaleString()}개 단어로 교체했습니다.`);
+  });
+  e.target.value="";
+});
 
 ["text"].forEach(id=>document.getElementById(id).addEventListener("input",render));
 renderBlacklist();renderWhitelist();render();
