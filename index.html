@@ -69,6 +69,13 @@
   .src-sub{font-weight:400;color:var(--muted);font-size:12px}
   .lexadd{display:flex;gap:8px}
   .lexadd input{flex:1}
+  .inwrap{position:relative;flex:1}
+  .inwrap input{width:100%;padding-right:34px}
+  .clr{position:absolute;right:8px;top:50%;transform:translateY(-50%);width:18px;height:18px;border:none;
+    border-radius:50%;background:#c3ccdb;color:#fff;font-size:13px;line-height:1;cursor:pointer;padding:0;
+    display:none;align-items:center;justify-content:center}
+  .clr:hover{background:#9aa3b6}
+  .clr.show{display:inline-flex}
   .add{font-family:var(--sans);font-size:13px;font-weight:600;background:var(--blue);color:#fff;border:none;border-radius:5px;padding:8px 18px;cursor:pointer;white-space:nowrap}
   .add:hover{background:var(--blue-d)}
   .dict-tools{display:flex;justify-content:flex-end;gap:7px;margin-top:8px}
@@ -147,7 +154,10 @@
 
         <div class="sub-h">블랙리스트 <span class="src-sub">· 이 단어가 들어가면 차단</span> <span id="blCount" class="src-sub"></span></div>
         <div class="lexadd">
-          <input id="blNew" type="text" placeholder="단어 입력 · 입력하면 실시간 검색, 추가하려면 Enter 또는 [추가]" autocomplete="off">
+          <div class="inwrap">
+            <input id="blNew" type="text" placeholder="단어 입력 · 입력하면 실시간 검색, 추가하려면 Enter 또는 [추가]" autocomplete="off">
+            <button type="button" class="clr" id="blClr" aria-label="입력 지우기">&times;</button>
+          </div>
           <button class="add" id="blAdd">추가</button>
         </div>
         <div class="dict-tools">
@@ -160,7 +170,10 @@
 
         <div class="sub-h">화이트리스트 <span class="src-sub">· 이 단어가 들어가면 통과 (예: 시발점)</span> <span id="wlCount" class="src-sub"></span></div>
         <div class="lexadd">
-          <input id="wlNew" type="text" placeholder="단어 입력 · 입력하면 실시간 검색, 추가하려면 Enter 또는 [추가] (예: 시발점)" autocomplete="off">
+          <div class="inwrap">
+            <input id="wlNew" type="text" placeholder="단어 입력 · 입력하면 실시간 검색, 추가하려면 Enter 또는 [추가] (예: 시발점)" autocomplete="off">
+            <button type="button" class="clr" id="wlClr" aria-label="입력 지우기">&times;</button>
+          </div>
           <button class="add" id="wlAdd">추가</button>
         </div>
         <div class="dict-tools">
@@ -403,11 +416,13 @@ function addBlack(){
   BL_REMOVED.delete(w);
   if(!BL_DEFAULT.includes(w)&&!BL_CUSTOM.includes(w))BL_CUSTOM.unshift(w);
   document.getElementById("blNew").value="";
+  syncClr("blNew","blClr");
   buildLex();renderBlacklist();render();
 }
 function addWhite(){
   const w=document.getElementById("wlNew").value.trim(); if(!w||WHITELIST.includes(w))return;
   WHITELIST.unshift(w);document.getElementById("wlNew").value="";
+  syncClr("wlNew","wlClr");
   renderWhitelist();render();
 }
 document.getElementById("blAdd").onclick=addBlack;
@@ -417,6 +432,16 @@ document.getElementById("wlNew").addEventListener("keydown",e=>{if(e.key==="Ente
 // 입력창 = 검색창 겸용: 타이핑하면 실시간 검색(필터)
 document.getElementById("blNew").addEventListener("input",renderBlacklist);
 document.getElementById("wlNew").addEventListener("input",renderWhitelist);
+
+// 입력창 X(지우기) 버튼: 내용이 있으면 표시, 클릭하면 비우기
+function syncClr(inputId,btnId){
+  document.getElementById(btnId).classList.toggle("show",!!document.getElementById(inputId).value.length);
+}
+[["blNew","blClr",renderBlacklist],["wlNew","wlClr",renderWhitelist]].forEach(([inId,btnId,rerender])=>{
+  const inp=document.getElementById(inId),btn=document.getElementById(btnId);
+  inp.addEventListener("input",()=>syncClr(inId,btnId));
+  btn.addEventListener("click",()=>{inp.value="";syncClr(inId,btnId);rerender();inp.focus();});
+});
 
 // ── 기본 사전 로드 (lisuugi 전 카테고리 레벨1~2 + hlog2e, 구분 없이 블랙리스트로) ──
 const LIS_BASE="https://cdn.jsdelivr.net/gh/lisuugi/korean-profanity-filter@master/src/main/resources/dictionary/";
