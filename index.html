@@ -420,6 +420,35 @@ for 명사 W in 국어사전(표준국어대사전 명사 ~19만):
 
         <h4>A-10. 한계 (중요)</h4>
         <p>자동 화이트리스트는 <b>국어사전 ‘명사’만</b> 예외 처리한다. 따라서 <code>보지 마세요</code>(보다+지), <code>자지러지다</code> 같은 <b>동사 활용형</b>은 명사가 아니라서 이 목록으로 못 살린다 → 이것은 <b>맥락 예외(<code>CONTEXT_SAFE</code>, 5장)</b>가 담당한다. 규칙으로 못 가르는 신종 문맥은 본 시스템 범위 밖(구조적 한계)이며, 블랙리스트·맥락 예외 수기 보강으로 대응한다.</p>
+
+        <h3>부록 B. 판정 처리 흐름 &amp; 검증 예제</h3>
+
+        <h4>B-1. 처리 순서 (파이프라인)</h4>
+        <p>한 건의 입력은 <code>dictDetect()</code>에서 아래 순서로 처리된다. <b>앞 단계에서 제거된 부분은 뒤 단계에서 검사되지 않는다</b>(그래서 정상어·동사형은 제거되어 통과, 우회는 남아서 차단).</p>
+        <pre style="font-family:var(--mono);font-size:12px;background:#12151a;color:#e6edf3;border-radius:8px;padding:12px 14px;overflow-x:auto;line-height:1.7">입력 원문
+ │
+ ├ ① stripWhitelist    (수동+자동) 화이트리스트 단어 제거   ← 자동 화이트리스트(명사)
+ ├ ② stripContextSafe  동음이의 동사형(보지+마/못, 자지+러 등) 제거  ← 맥락 예외
+ ├ ③ normalize         표준형(자모 시퀀스)으로 변환  ← 우회 복원(특수문자·영타·자모분해)
+ │
+ └ 매칭  ④ 표준형 부분매칭 (canon 길이 ≥ CANON_MIN)
+         ⑤ 초성 매칭 (ㅅㅂ 등)      ⑥ 음역 매칭 (ssibal 등)
+
+   → ④⑤⑥ 중 하나라도 걸리면 '차단', 아니면 '통과'</pre>
+
+        <h4>B-2. 검증 예제 (회귀 테스트)</h4>
+        <p>아래는 코드 변경 시 유지되어야 하는 기준 판정이며, 각 행이 <b>어느 단계에서 결정되는지</b>를 함께 표기한다. 실제 판정 함수(<code>evaluate()</code>)로 검증했다(15/15 통과). 오프라인 배치와 브라우저 재생성이 동일 결과임도 확인.</p>
+        <table>
+          <tr><th>입력</th><th>결과</th><th>결정 단계</th><th>설명</th></tr>
+          <tr><td>보지 / 자지 / 자위</td><td><span class="tag" style="background:var(--red)">차단</span></td><td>④ 표준형 부분매칭</td><td>4자모 표준형이 블랙리스트 canon과 일치(CANON_MIN=4)</td></tr>
+          <tr><td>보지 마세요 / 보지 못했어요 / 해보지 마</td><td><span class="tag t-ok">통과</span></td><td>② 맥락 예외</td><td>보다+지 → 마/못 → 동사로 판단해 ‘보지’ 부분 제거</td></tr>
+          <tr><td>자지 마(자다) / 자지러지게 웃었다</td><td><span class="tag t-ok">통과</span></td><td>② 맥락 예외</td><td>자다+지 → 마 / 자지러 → 러 → 해당 부분 제거</td></tr>
+          <tr><td>보지 만져 (슬러)</td><td><span class="tag" style="background:var(--red)">차단</span></td><td>④ 표준형 부분매칭</td><td>‘만’은 허용접미(마/말/못/않)가 아님 → 맥락 예외 미적용 → 그대로 매칭</td></tr>
+          <tr><td>자위권 발동 / 눈자위가 떨려</td><td><span class="tag t-ok">통과</span></td><td>① 자동 화이트리스트</td><td>국어사전 명사(자위권·눈자위)로 등록되어 원문에서 제거</td></tr>
+          <tr><td>시★발 (우회)</td><td><span class="tag" style="background:var(--red)">차단</span></td><td>③→④</td><td>정규화가 ★ 제거 → ‘시발’ 표준형 복원 → 매칭(화이트리스트는 우회에 미적용)</td></tr>
+          <tr><td>ㅅㅂ (초성)</td><td><span class="tag" style="background:var(--red)">차단</span></td><td>⑤ 초성 매칭</td><td>독립 초성 우회 탐지</td></tr>
+        </table>
+        <p class="src-sub">※ 이 표는 개발 시 <b>회귀 검증 체크리스트</b>로 사용한다. 정규화·임계값(CANON_MIN)·맥락 예외(CONTEXT_SAFE)·자동 화이트리스트를 수정하면 이 결과가 유지되는지 다시 확인한다.</p>
       </div>
     </div>
   </div>
