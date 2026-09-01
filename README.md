@@ -15,6 +15,9 @@
 node scripts/gen_whitelist.mjs
 ```
 
+- 화면에서 운영자가 블랙리스트를 수정한 경우, **사전 관리 화면의 "현재 블랙리스트로 재생성" 버튼**으로
+  브라우저에서 즉시(현재 블랙리스트 기준) 다시 생성할 수 있다. 블랙리스트 개수가 생성 시점과 달라지면
+  자동으로 "재생성 권장" 안내가 표시된다. (영구 반영은 위 배치로 재생성 후 `whitelist_auto.json` 커밋)
 - 정규화 로직은 `index.html`의 `normalize()`를 그대로 추출해 사용하므로 런타임과 100% 동일하다.
 - 출처: 블랙리스트 = lisuugi/korean-profanity-filter(Apache-2.0) + hlog2e/bad_word_list,
   명사 = pd-korean-noun-list-for-wordles(Public Domain, 표준국어대사전 표제어).
