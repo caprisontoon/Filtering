@@ -86,6 +86,7 @@
   .lw{font-size:12.5px;background:#fff;border:1px solid var(--line2);border-radius:4px;padding:3px 4px 3px 9px;display:inline-flex;align-items:center;gap:7px;color:#333}
   .lw button{border:none;background:var(--pink);color:#fff;cursor:pointer;font-size:11px;line-height:1;width:16px;height:16px;border-radius:3px;display:inline-flex;align-items:center;justify-content:center;padding:0}
   .lw button:hover{background:#d12d78}
+  #awlList .lw{padding:3px 9px;color:#556;background:#f6f8fc}
   .dict-div{height:1px;background:var(--line);margin:20px 0}
   .note{background:#f7f9fc;border:1px solid var(--line);border-radius:6px;padding:12px 14px;font-size:12px;color:var(--muted);line-height:1.7}
   .note b{color:#444}
@@ -182,6 +183,11 @@
           <button class="xbtn up" data-list="wl">&#11121; 엑셀 업로드</button>
         </div>
         <div id="wlList" class="publist" style="margin-top:8px;max-height:150px"></div>
+
+        <div class="sub-h" style="margin-top:16px">자동 화이트리스트 <span class="src-sub">· 국어사전 명사 기반 자동 생성(부분매칭 오탐 방지) · 읽기 전용</span> <span id="awlCount" class="src-sub"></span></div>
+        <input id="awlSearch" type="text" placeholder="자동 화이트리스트 검색…" autocomplete="off">
+        <div id="awlList" class="publist" style="margin-top:8px;max-height:150px"></div>
+
         <input type="file" id="blFile" accept=".xlsx,.xls,.csv" style="display:none">
         <input type="file" id="wlFile" accept=".xlsx,.xls,.csv" style="display:none">
       </section>
@@ -258,7 +264,16 @@ function standaloneCho(t){
 let BL_DEFAULT=[];            // 원격 기본 블랙리스트 원본 (lisuugi + hlog2e)
 const BL_REMOVED=new Set();   // 기본값 중 사용자가 삭제한 단어
 let BL_CUSTOM=[];             // 사용자가 직접 추가한 단어
-let WHITELIST=["시발점"];     // 화이트리스트
+let WHITELIST=["시발점"];     // 수동 화이트리스트
+let WL_AUTO=[];               // 자동 화이트리스트(국어사전 명사 기반, whitelist_auto.json에서 로드)
+let WL_ALL=["시발점"];        // 수동+자동 병합(길이 내림차순, stripWhitelist용 캐시)
+function rebuildWhitelist(){
+  const seen=new Set(),all=[];
+  for(const w of WHITELIST){ if(w&&!seen.has(w)){seen.add(w);all.push(w);} }
+  for(const w of WL_AUTO){ if(w&&!seen.has(w)){seen.add(w);all.push(w);} }
+  all.sort((a,b)=>b.length-a.length);   // 긴 단어 우선 제거(최장일치)
+  WL_ALL=all;
+}
 
 function effectiveBlacklist(){
   const out=[],seen=new Set();
@@ -300,9 +315,10 @@ function buildRoman(){
 buildRoman();
 
 function stripWhitelist(text){
-  // 화이트리스트 단어를 원문에서 제거 → 그 안에 든 비속어 부분문자열이 오탐되지 않음
+  // 화이트리스트(수동+자동) 단어를 원문에서 제거 → 그 안에 든 비속어 부분문자열이 오탐되지 않음
+  // 긴 단어부터(WL_ALL은 길이 내림차순), includes 가드로 불필요한 split 방지(성능)
   let t=text||"";
-  for(const w of WHITELIST){if(w)t=t.split(w).join(" ");}
+  for(const w of WL_ALL){ if(w&&t.includes(w))t=t.split(w).join(" "); }
   return t;
 }
 function dictDetect(text){
@@ -399,6 +415,24 @@ function renderWhitelist(){
     ? (shown.length?shown.map(w=>chipHtml(w,"wl")).join(""):`<span style="font-size:12px;color:var(--muted)">일치하는 단어가 없습니다</span>`)
     : `<span style="font-size:12px;color:var(--muted)">아직 없음</span>`;
 }
+// 자동 화이트리스트: 읽기 전용, 검색 기반(대량이므로 렌더 상한)
+function renderAutoWhitelist(){
+  const q=(document.getElementById("awlSearch").value||"").trim().toLowerCase();
+  document.getElementById("awlCount").textContent=`· ${WL_AUTO.length.toLocaleString()}개`;
+  const el=document.getElementById("awlList");
+  if(!WL_AUTO.length){ el.innerHTML=`<span style="font-size:12px;color:var(--muted)">준비 중 / 미로드</span>`; return; }
+  const matched=q?WL_AUTO.filter(w=>w.toLowerCase().includes(q)):WL_AUTO;
+  const CAP=300, shown=matched.slice(0,CAP);
+  el.innerHTML=shown.length
+    ? shown.map(w=>`<span class="lw">${escapeHtml(w)}</span>`).join("")
+      +(matched.length>CAP?`<span style="font-size:12px;color:var(--muted)">…외 ${(matched.length-CAP).toLocaleString()}개 더 (검색으로 좁히기)</span>`:"")
+    : `<span style="font-size:12px;color:var(--muted)">일치하는 단어가 없습니다</span>`;
+}
+function loadAutoWhitelist(){
+  fetch("whitelist_auto.json",{cache:"no-cache"}).then(r=>r.ok?r.json():null).then(j=>{
+    if(j&&Array.isArray(j.words)){ WL_AUTO=j.words; rebuildWhitelist(); renderAutoWhitelist(); render(); }
+  }).catch(()=>{});
+}
 
 // ── 삭제 (이벤트 위임) ──
 document.getElementById("blList").addEventListener("click",e=>{
@@ -410,7 +444,7 @@ document.getElementById("blList").addEventListener("click",e=>{
 });
 document.getElementById("wlList").addEventListener("click",e=>{
   const b=e.target.closest("button[data-w]"); if(!b)return;
-  WHITELIST=WHITELIST.filter(x=>x!==b.dataset.w);renderWhitelist();render();
+  WHITELIST=WHITELIST.filter(x=>x!==b.dataset.w);rebuildWhitelist();renderWhitelist();render();
 });
 
 // ── 추가 ──
@@ -426,7 +460,7 @@ function addWhite(){
   const w=document.getElementById("wlNew").value.trim(); if(!w||WHITELIST.includes(w))return;
   WHITELIST.unshift(w);document.getElementById("wlNew").value="";
   syncClr("wlNew","wlClr");
-  renderWhitelist();render();
+  rebuildWhitelist();renderWhitelist();render();
 }
 document.getElementById("blAdd").onclick=addBlack;
 document.getElementById("wlAdd").onclick=addWhite;
@@ -518,14 +552,17 @@ document.getElementById("wlFile").addEventListener("change",e=>{
   const f=e.target.files[0];e.target.value="";if(!f)return;
   importList(f,words=>{
     WHITELIST=words.slice();
-    renderWhitelist();render();
+    rebuildWhitelist();renderWhitelist();render();
     alert(`화이트리스트를 업로드한 ${words.length.toLocaleString()}개 단어로 교체했습니다.`);
   });
 });
+document.getElementById("awlSearch").addEventListener("input",renderAutoWhitelist);
 
 ["text"].forEach(id=>document.getElementById(id).addEventListener("input",render));
-renderBlacklist();renderWhitelist();render();
+rebuildWhitelist();
+renderBlacklist();renderWhitelist();renderAutoWhitelist();render();
 loadDicts();
+loadAutoWhitelist();
 </script>
 </body>
 </html>
