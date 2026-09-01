@@ -322,6 +322,71 @@
           <li>동음이의 단독어(<code>시발</code>=始發)는 후원 맥락상 계속 차단이 타당.</li>
           <li><span class="tag t-soon">예정</span> 후원 페이지 연동(결제·노출 이전 필터 호출), 프로덕션 백엔드(DB·API, 사전 캐시·변경 즉시 반영·차단 로그), 회원 신고제재(별도 기획).</li>
         </ul>
+
+        <h3>부록 A. 자동 화이트리스트 로직 (상세)</h3>
+
+        <h4>A-1. 왜 필요한가 (문제)</h4>
+        <p>필터는 블랙리스트 단어를 <b>부분문자열(substring)</b>로 매칭한다. 이러면 비속어가 <b>정상 단어의 일부</b>일 때도 걸린다.</p>
+        <ul>
+          <li><code>시발</code>(욕) 등록 → <code>시발점</code>(始發點, 출발점)까지 차단</li>
+          <li><code>자위</code> 등록 → <code>자위권·자위대</code>(自衛, 자기방어)·<code>눈자위</code>까지 차단</li>
+        </ul>
+        <p>이런 충돌 단어를 사람이 손으로 화이트리스트에 넣는 것은 범위가 너무 넓어 불가능하다. 그래서 <b>국어사전에서 자동으로 뽑는다.</b></p>
+
+        <h4>A-2. 핵심 아이디어 (한 문장)</h4>
+        <p class="lead">국어사전 명사 중에서 “<b>블랙리스트 표준형을 부분문자열로 포함</b>하지만 <b>그 자체는 슬러가 아닌</b>” 단어만 골라 예외(통과) 목록으로 만든다.</p>
+
+        <h4>A-3. 용어</h4>
+        <ul>
+          <li><b>표준형(canon)</b>: <code>normalize()</code>를 거친 자모 시퀀스. 예) <code>시발 → ㅅㅣㅂㅏㄹ</code>, <code>시발점 → ㅅㅣㅂㅏㄹㅈㅓㅁ</code>.</li>
+          <li><b>CANON_MIN</b>: 부분매칭 대상이 되는 표준형 최소 자모 수(현재 <b>4</b>). 블랙리스트 단어라도 표준형이 이보다 짧으면 부분매칭 대상이 아니다.</li>
+          <li><b>canon 집합</b>: 블랙리스트 각 단어의 표준형 중 길이 ≥ CANON_MIN 인 것들의 집합(= 런타임 <code>BLCANON</code>의 키).</li>
+        </ul>
+
+        <h4>A-4. 생성 알고리즘 (의사코드)</h4>
+        <pre style="font-family:var(--mono);font-size:12px;background:#12151a;color:#e6edf3;border-radius:8px;padding:12px 14px;overflow-x:auto;line-height:1.6">canonSet = { normalize(w) | w ∈ 블랙리스트, |normalize(w)| ≥ CANON_MIN }
+
+for 명사 W in 국어사전(표준국어대사전 명사 ~19만):
+    if W ∈ 블랙리스트:            continue   # 슬러 자체는 제외
+    c = normalize(W)
+    if |c| &lt; CANON_MIN:            continue   # 너무 짧으면 부분매칭 대상 아님 → 오탐 없음
+    if c ∈ canonSet:              continue   # ★ 표준형이 슬러와 '정확히' 같으면 제외(계속 차단)
+    if c 가 canonSet의 어떤 원소를 부분문자열로 포함:
+        자동_화이트리스트 += W                # 오탐 유발 정상어 → 예외로 등록</pre>
+        <p>마지막 조건(부분문자열 포함 검사)은 canon이 수천 개라 <b>Aho-Corasick 오토마톤</b>으로 한 번의 스캔에 처리한다(명사 19만 × canon 수천 을 순진하게 곱하면 수억 회 → 실사용 불가).</p>
+
+        <h4>A-5. 두 제외 조건이 중요한 이유</h4>
+        <ul>
+          <li><b>W ∈ 블랙리스트 → 제외</b>: 사전에는 <code>씨발·개새끼</code> 같은 욕도 표제어로 실려 있다. “사전에 있으니 통과”는 위험 → 슬러 자체는 화이트리스트에 넣지 않는다.</li>
+          <li><b>c ∈ canonSet(정확 일치) → 제외</b>: 표준형이 슬러와 똑같은 단어는 계속 차단. 예) <code>시발</code>(始發)은 표준형이 <code>ㅅㅣㅂㅏㄹ</code>로 슬러와 동일 → 제외되어 <b>계속 차단</b>. 반면 <code>시발점</code>은 더 길어 정확 일치가 아니므로 <b>통과 목록에 포함</b>. (동음이의 단독어는 후원 맥락상 차단 유지)</li>
+        </ul>
+
+        <h4>A-6. 워크드 예제</h4>
+        <table>
+          <tr><th>명사 W</th><th>normalize(W)</th><th>판정</th><th>이유</th></tr>
+          <tr><td>시발점</td><td>ㅅㅣㅂㅏㄹㅈㅓㅁ</td><td><span class="tag t-ok">추가</span></td><td>ㅅㅣㅂㅏㄹ 포함, 자기 자신은 슬러 아님</td></tr>
+          <tr><td>자위권</td><td>ㅈㅏㅇㅟㄱㅝㄴ</td><td><span class="tag t-ok">추가</span></td><td>ㅈㅏㅇㅟ(자위) 포함, 정상어</td></tr>
+          <tr><td>눈자위</td><td>ㄴㅜㄴㅈㅏㅇㅟ</td><td><span class="tag t-ok">추가</span></td><td>ㅈㅏㅇㅟ 포함, 정상어</td></tr>
+          <tr><td>시발 / 자위</td><td>ㅅㅣㅂㅏㄹ / ㅈㅏㅇㅟ</td><td><span class="tag t-ai">제외</span></td><td>표준형이 슬러와 정확히 일치 → 계속 차단</td></tr>
+          <tr><td>안녕 / 방송</td><td>ㅇㅏㄴㄴㅕㅇ / …</td><td><span class="tag t-ai">제외</span></td><td>어떤 canon도 포함하지 않음(애초에 오탐 없음)</td></tr>
+        </table>
+
+        <h4>A-7. 런타임에서 어떻게 쓰이나</h4>
+        <ul>
+          <li>판정 직전 <code>stripWhitelist()</code>가 원문에서 (수동+자동) 화이트리스트 단어를 제거한다. 예) <code>"시발점에서 만나요"</code> → <code>시발점</code> 제거 → 남은 텍스트에 슬러 표준형 없음 → <b>통과</b>.</li>
+          <li>여러 단어가 겹칠 때를 위해 <b>긴 단어부터</b> 제거한다(최장일치). 성능을 위해 <code>includes</code> 가드 후 치환.</li>
+          <li>중요: 화이트리스트는 <b>원문(깨끗한 텍스트)</b>에서 제거하므로, 우회 표기(<code>시★발</code>)에는 적용되지 않는다 → 우회는 그대로 차단(2계층 분리).</li>
+        </ul>
+
+        <h4>A-8. 데이터 흐름 &amp; 파일</h4>
+        <ul>
+          <li><b>오프라인 배치</b> <code>scripts/gen_whitelist.mjs</code> — 블랙리스트(lisuugi+hlog2e)와 명사사전을 받아 위 알고리즘으로 <code>whitelist_auto.json</code> 생성. 정규화는 <code>index.html</code>의 <code>normalize()</code>를 그대로 추출해 사용(런타임과 100% 동일).</li>
+          <li><b>브라우저</b> — 페이지 로드시 자사 <code>whitelist_auto.json</code>을 불러와 화이트리스트에 병합.</li>
+          <li><b>즉시 재생성</b> — 운영자가 블랙리스트를 수정하면 “현재 블랙리스트로 재생성” 버튼이 명사사전을 받아 <b>현재</b> 블랙리스트 기준으로 브라우저에서 재계산(오프라인 배치와 동일 결과). 영구 반영은 배치 재실행 후 <code>whitelist_auto.json</code> 커밋.</li>
+        </ul>
+
+        <h4>A-9. 한계 (중요)</h4>
+        <p>자동 화이트리스트는 <b>국어사전 ‘명사’만</b> 예외 처리한다. 따라서 <code>보지 마세요</code>(보다+지), <code>자지러지다</code> 같은 <b>동사 활용형</b>은 명사가 아니라서 이 목록으로 못 살린다 → 이것은 <b>맥락 예외(<code>CONTEXT_SAFE</code>, 5장)</b>가 담당한다. 규칙으로 못 가르는 신종 문맥은 향후 AI 몫.</p>
       </div>
     </div>
   </div>
