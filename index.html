@@ -221,7 +221,7 @@
           <button class="xbtn gen" id="awlRegen" type="button">&#8635; 현재 블랙리스트로 재생성</button>
         </div>
         <input id="awlSearch" type="text" placeholder="자동 화이트리스트 검색…" autocomplete="off">
-        <div id="awlList" class="publist" style="margin-top:8px;max-height:150px"></div>
+        <div id="awlList" class="publist" style="margin-top:8px;max-height:260px"></div>
 
         <input type="file" id="blFile" accept=".xlsx,.xls,.csv" style="display:none">
         <input type="file" id="wlFile" accept=".xlsx,.xls,.csv" style="display:none">
@@ -694,10 +694,8 @@ function renderAutoWhitelist(){
   const el=document.getElementById("awlList");
   if(!eff.length){ el.innerHTML=`<span style="font-size:12px;color:var(--muted)">${WL_AUTO.length?"모두 삭제됨":"준비 중 / 미로드"}</span>`; return; }
   const matched=q?eff.filter(w=>w.toLowerCase().includes(q)):eff;
-  const CAP=300, shown=matched.slice(0,CAP);
-  el.innerHTML=shown.length
-    ? shown.map(w=>chipHtml(w,"awl")).join("")
-      +(matched.length>CAP?`<span style="font-size:12px;color:var(--muted)">…외 ${(matched.length-CAP).toLocaleString()}개 더 (검색으로 좁히기)</span>`:"")
+  el.innerHTML=matched.length
+    ? matched.map(w=>chipHtml(w,"awl")).join("")
     : `<span style="font-size:12px;color:var(--muted)">일치하는 단어가 없습니다</span>`;
 }
 function loadAutoWhitelist(){
