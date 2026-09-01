@@ -88,7 +88,7 @@
   .lw{font-size:12.5px;background:#fff;border:1px solid var(--line2);border-radius:4px;padding:3px 4px 3px 9px;display:inline-flex;align-items:center;gap:7px;color:#333}
   .lw button{border:none;background:var(--pink);color:#fff;cursor:pointer;font-size:11px;line-height:1;width:16px;height:16px;border-radius:3px;display:inline-flex;align-items:center;justify-content:center;padding:0}
   .lw button:hover{background:#d12d78}
-  #awlList .lw{padding:3px 9px;color:#556;background:#f6f8fc}
+  #awlList .lw{color:#556;background:#f6f8fc}
   .dict-div{height:1px;background:var(--line);margin:20px 0}
   .note{background:#f7f9fc;border:1px solid var(--line);border-radius:6px;padding:12px 14px;font-size:12px;color:var(--muted);line-height:1.7}
   .note b{color:#444}
@@ -215,7 +215,7 @@
         </div>
         <div id="wlList" class="publist" style="margin-top:8px;max-height:150px"></div>
 
-        <div class="sub-h" style="margin-top:16px">자동 화이트리스트 <span class="src-sub">· 국어사전 명사 기반 자동 생성(부분매칭 오탐 방지) · 읽기 전용</span> <span id="awlCount" class="src-sub"></span></div>
+        <div class="sub-h" style="margin-top:16px">자동 화이트리스트 <span class="src-sub">· 국어사전 명사 기반 자동 생성(부분매칭 오탐 방지) · 단어별 삭제 가능(삭제 시 다시 차단 대상)</span> <span id="awlCount" class="src-sub"></span></div>
         <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap">
           <span id="awlStatus" class="src-sub"></span>
           <button class="xbtn gen" id="awlRegen" type="button">&#8635; 현재 블랙리스트로 재생성</button>
@@ -279,7 +279,7 @@
         <ul>
           <li><b>블랙리스트(차단)</b>: 공개 목록 lisuugi(레벨 1~2 전 카테고리) + hlog2e를 구분 없이 병합해 기본 탑재(약 3,670개). 관리자 추가/삭제 가능.</li>
           <li><b>수동 화이트리스트(통과)</b>: 관리자가 직접 관리하는 예외(예: <code>시발점</code>).</li>
-          <li><b>자동 화이트리스트</b>: 국어사전 명사 중 “블랙리스트 canon(≥CANON_MIN)을 부분문자열로 포함하되 그 자체는 슬러가 아닌” 정상어(현재 약 2,100개). 읽기 전용, 검색 제공.</li>
+          <li><b>자동 화이트리스트</b>: 국어사전 명사 중 “블랙리스트 canon(≥CANON_MIN)을 부분문자열로 포함하되 그 자체는 슬러가 아닌” 정상어(현재 약 2,100개). 검색·단어별 삭제 제공(삭제 시 예외 해제 → 다시 차단 대상, 재생성해도 삭제 유지).</li>
           <li>저장/매칭: 등록 단어는 표준형으로 대조. 화이트리스트는 원문에서 먼저 제거 후 판정.</li>
         </ul>
 
@@ -518,12 +518,14 @@ const BL_REMOVED=new Set();   // 기본값 중 사용자가 삭제한 단어
 let BL_CUSTOM=[];             // 사용자가 직접 추가한 단어
 let WHITELIST=["시발점"];     // 수동 화이트리스트
 let WL_AUTO=[];               // 자동 화이트리스트(국어사전 명사 기반, whitelist_auto.json에서 로드)
+const WL_AUTO_REMOVED=new Set(); // 운영자가 자동 화이트리스트에서 삭제한 단어(재생성해도 유지)
 let AWL_BASELINE=null;        // 자동 화이트리스트 생성 당시의 블랙리스트 개수(변경 감지용)
 let WL_ALL=["시발점"];        // 수동+자동 병합(길이 내림차순, stripWhitelist용 캐시)
+function effectiveAuto(){ return WL_AUTO.filter(w=>!WL_AUTO_REMOVED.has(w)); }
 function rebuildWhitelist(){
   const seen=new Set(),all=[];
   for(const w of WHITELIST){ if(w&&!seen.has(w)){seen.add(w);all.push(w);} }
-  for(const w of WL_AUTO){ if(w&&!seen.has(w)){seen.add(w);all.push(w);} }
+  for(const w of WL_AUTO){ if(w&&!WL_AUTO_REMOVED.has(w)&&!seen.has(w)){seen.add(w);all.push(w);} }
   all.sort((a,b)=>b.length-a.length);   // 긴 단어 우선 제거(최장일치)
   WL_ALL=all;
 }
@@ -682,16 +684,17 @@ function renderWhitelist(){
     ? (shown.length?shown.map(w=>chipHtml(w,"wl")).join(""):`<span style="font-size:12px;color:var(--muted)">일치하는 단어가 없습니다</span>`)
     : `<span style="font-size:12px;color:var(--muted)">아직 없음</span>`;
 }
-// 자동 화이트리스트: 읽기 전용, 검색 기반(대량이므로 렌더 상한)
+// 자동 화이트리스트: 단어별 삭제(×) + 검색 기반(대량이므로 렌더 상한)
 function renderAutoWhitelist(){
   const q=(document.getElementById("awlSearch").value||"").trim().toLowerCase();
-  document.getElementById("awlCount").textContent=`· ${WL_AUTO.length.toLocaleString()}개`;
+  const eff=effectiveAuto();
+  document.getElementById("awlCount").textContent=`· ${eff.length.toLocaleString()}개`;
   const el=document.getElementById("awlList");
-  if(!WL_AUTO.length){ el.innerHTML=`<span style="font-size:12px;color:var(--muted)">준비 중 / 미로드</span>`; return; }
-  const matched=q?WL_AUTO.filter(w=>w.toLowerCase().includes(q)):WL_AUTO;
+  if(!eff.length){ el.innerHTML=`<span style="font-size:12px;color:var(--muted)">${WL_AUTO.length?"모두 삭제됨":"준비 중 / 미로드"}</span>`; return; }
+  const matched=q?eff.filter(w=>w.toLowerCase().includes(q)):eff;
   const CAP=300, shown=matched.slice(0,CAP);
   el.innerHTML=shown.length
-    ? shown.map(w=>`<span class="lw">${escapeHtml(w)}</span>`).join("")
+    ? shown.map(w=>chipHtml(w,"awl")).join("")
       +(matched.length>CAP?`<span style="font-size:12px;color:var(--muted)">…외 ${(matched.length-CAP).toLocaleString()}개 더 (검색으로 좁히기)</span>`:"")
     : `<span style="font-size:12px;color:var(--muted)">일치하는 단어가 없습니다</span>`;
 }
@@ -792,6 +795,11 @@ document.getElementById("blList").addEventListener("click",e=>{
 document.getElementById("wlList").addEventListener("click",e=>{
   const b=e.target.closest("button[data-w]"); if(!b)return;
   WHITELIST=WHITELIST.filter(x=>x!==b.dataset.w);rebuildWhitelist();renderWhitelist();render();
+});
+document.getElementById("awlList").addEventListener("click",e=>{
+  const b=e.target.closest("button[data-w]"); if(!b)return;
+  WL_AUTO_REMOVED.add(b.dataset.w);   // 삭제 시 예외에서 제외 → 해당 단어 다시 차단 대상
+  rebuildWhitelist();renderAutoWhitelist();render();
 });
 
 // ── 추가 ──
