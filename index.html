@@ -289,13 +289,16 @@ function effectiveBlacklist(){
   return out;
 }
 
-// 매칭 인덱스: BLCANON=정규화 표준형(5자모↑, 정확), BLCHO=2음절 핵심어의 초성
+// 표준형 부분매칭 최소 길이(자모 수). 4=짧은 2음절 단어(자위·보지·자지 등)도 매칭.
+// 짧을수록 정상어 오탐↑ → 자동 화이트리스트 + 맥락 예외(CONTEXT_SAFE)로 보완.
+const CANON_MIN=4;
+// 매칭 인덱스: BLCANON=정규화 표준형(CANON_MIN자모↑, 정확), BLCHO=2음절 핵심어의 초성
 let BLCANON={},BLCHO={},BL_WORDS=[];
 function buildLex(){
   BLCANON={};BLCHO={};BL_WORDS=effectiveBlacklist();
   for(const w of BL_WORDS){
     const c=normalize(w);
-    if(c.length>=5 && !(c in BLCANON))BLCANON[c]=w;   // 표준형→원본 단어
+    if(c.length>=CANON_MIN && !(c in BLCANON))BLCANON[c]=w;   // 표준형→원본 단어
     const ch=chosungFull(w);
     if(ch.length===2 && !(ch in BLCHO))BLCHO[ch]=w;   // ㅅㅂ 등 초성 우회 대응
   }
@@ -328,8 +331,18 @@ function stripWhitelist(text){
   for(const w of WL_ALL){ if(w&&t.includes(w))t=t.split(w).join(" "); }
   return t;
 }
+/* 맥락 예외(동음이의 동사형): 짧은 슬러가 정상 동사 활용으로 쓰인 경우 그 부분만 제거.
+   한국어 어미 '-지'는 거의 항상 마/말/못/않(부정 보조용언)과 결합 → 이 패턴이면 동사로 간주.
+   예: '보지 마세요'(보다+지), '자지 마'(자다+지), '자지러지다'(러) → 통과 / '보지' 단독 → 차단 */
+const CONTEXT_SAFE={ "보지":["마","말","못","않"], "자지":["마","말","못","않","러"] };
+const CONTEXT_RE=Object.entries(CONTEXT_SAFE).map(([w,sufs])=>[w,new RegExp(w+"(\\s*)("+sufs.join("|")+")","g")]);
+function stripContextSafe(text){
+  let t=text||"";
+  for(const [w,re] of CONTEXT_RE)t=t.replace(re," $1$2");
+  return t;
+}
 function dictDetect(text){
-  text=stripWhitelist(text);
+  text=stripContextSafe(stripWhitelist(text));
   const canon=normalize(text);
   const runs=standaloneCho(text).split("\x00");
   const hits=[];
@@ -502,8 +515,8 @@ function regenAuto(){
         for(;i<end;i++){ const w=nouns[i];
           if(blSet.has(w))continue;
           const c=normalize(w);
-          if(c.length<5)continue;      // 짧은 정상어는 부분매칭 대상 아님
-          if(c in BLCANON)continue;    // 그 자체가 슬러 표준형 → 계속 차단
+          if(c.length<CANON_MIN)continue;  // 부분매칭 최소 길이 미만은 대상 아님
+          if(c in BLCANON)continue;        // 그 자체가 슬러 표준형 → 계속 차단
           if(has(c))out.push(w);
         }
         if(i<N){ st.textContent=`생성 중… ${Math.floor(i/N*100)}%`; setTimeout(chunk,0); }

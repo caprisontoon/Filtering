@@ -95,8 +95,9 @@ function buildAC(patterns) {
 async function main() {
   const BL = await loadBlacklist();
   const BL_SET = new Set(BL);
+  const CANON_MIN = 4;   // index.html의 CANON_MIN과 동일하게 유지
   const canonSet = new Set();
-  for (const w of BL) { const c = normalize(w); if (c.length >= 5) canonSet.add(c); }
+  for (const w of BL) { const c = normalize(w); if (c.length >= CANON_MIN) canonSet.add(c); }
   const ac = buildAC([...canonSet]);
   const nouns = await loadNouns();
 
@@ -104,15 +105,16 @@ async function main() {
   for (const w of nouns) {
     if (BL_SET.has(w)) continue;
     const c = normalize(w);
-    if (c.length < 5) continue;      // 짧은 정상어는 canon 부분매칭 대상 아님
-    if (canonSet.has(c)) continue;   // 그 자체가 슬러 표준형 → 계속 차단(예: 맨 '시발')
+    if (c.length < CANON_MIN) continue;  // 부분매칭 최소 길이 미만은 대상 아님
+    if (canonSet.has(c)) continue;       // 그 자체가 슬러 표준형 → 계속 차단(예: 맨 '시발')
     if (ac.has(c)) auto.push(w);
   }
   const words = [...new Set(auto)].sort((a, b) => a.localeCompare(b, "ko"));
 
   const out = {
-    _comment: "AUTO-GENERATED. 국어사전 명사(pd-korean-noun-list-for-wordles, PD) ∩ 블랙리스트(lisuugi+hlog2e) canon(len>=5). 재생성: node scripts/gen_whitelist.mjs",
+    _comment: `AUTO-GENERATED. 국어사전 명사(pd-korean-noun-list-for-wordles, PD) ∩ 블랙리스트(lisuugi+hlog2e) canon(len>=${CANON_MIN}). 재생성: node scripts/gen_whitelist.mjs`,
     generatedAt: new Date().toISOString().slice(0, 10),
+    canonMin: CANON_MIN,
     blacklistCount: BL.length,
     count: words.length,
     words,
