@@ -82,6 +82,8 @@
   .xbtn{font-family:var(--sans);font-size:12px;font-weight:600;background:#fff;border-radius:5px;padding:6px 12px;cursor:pointer;display:inline-flex;align-items:center;gap:5px}
   .xbtn.dl{border:1px solid #1ca97e;color:#1ca97e} .xbtn.dl:hover{background:#e9f8f2}
   .xbtn.up{border:1px solid var(--blue);color:var(--blue)} .xbtn.up:hover{background:#eef3fb}
+  .xbtn.gen{border:1px solid var(--blue);color:var(--blue)} .xbtn.gen:hover{background:#eef3fb}
+  .xbtn:disabled{opacity:.55;cursor:default}
   .publist{max-height:220px;overflow-y:auto;display:flex;flex-wrap:wrap;gap:6px;align-content:flex-start;border:1px solid var(--line);border-radius:6px;padding:10px;background:#fbfcfe}
   .lw{font-size:12.5px;background:#fff;border:1px solid var(--line2);border-radius:4px;padding:3px 4px 3px 9px;display:inline-flex;align-items:center;gap:7px;color:#333}
   .lw button{border:none;background:var(--pink);color:#fff;cursor:pointer;font-size:11px;line-height:1;width:16px;height:16px;border-radius:3px;display:inline-flex;align-items:center;justify-content:center;padding:0}
@@ -187,7 +189,7 @@
         <div class="sub-h" style="margin-top:16px">자동 화이트리스트 <span class="src-sub">· 국어사전 명사 기반 자동 생성(부분매칭 오탐 방지) · 읽기 전용</span> <span id="awlCount" class="src-sub"></span></div>
         <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap">
           <span id="awlStatus" class="src-sub"></span>
-          <button class="xbtn up" id="awlRegen" type="button">&#8635; 현재 블랙리스트로 재생성</button>
+          <button class="xbtn gen" id="awlRegen" type="button">&#8635; 현재 블랙리스트로 재생성</button>
         </div>
         <input id="awlSearch" type="text" placeholder="자동 화이트리스트 검색…" autocomplete="off">
         <div id="awlList" class="publist" style="margin-top:8px;max-height:150px"></div>
