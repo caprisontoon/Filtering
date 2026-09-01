@@ -93,6 +93,34 @@
   .note{background:#f7f9fc;border:1px solid var(--line);border-radius:6px;padding:12px 14px;font-size:12px;color:var(--muted);line-height:1.7}
   .note b{color:#444}
   .foot{margin-top:24px;text-align:center;font-size:12px;color:var(--muted)}
+  .tbtn.primary{background:var(--blue);border-color:var(--blue);color:#fff;font-weight:600}
+  .tbtn.primary:hover{background:var(--blue-d)}
+  /* 정책서 모달 */
+  .modal{position:fixed;inset:0;background:rgba(20,28,50,.5);display:flex;align-items:flex-start;
+    justify-content:center;padding:40px 16px;z-index:100;overflow-y:auto}
+  .modal[hidden]{display:none}
+  .modal-box{background:#fff;border-radius:10px;max-width:860px;width:100%;box-shadow:0 12px 40px rgba(20,28,50,.3);
+    display:flex;flex-direction:column;max-height:calc(100vh - 80px)}
+  .modal-head{display:flex;justify-content:space-between;align-items:center;padding:16px 22px;
+    border-bottom:1px solid var(--line);position:sticky;top:0;background:#fff;border-radius:10px 10px 0 0}
+  .modal-head b{font-size:16px;color:#2f3746}
+  .modal-head .mh-sub{font-size:12px;color:var(--muted);font-weight:400;margin-left:8px}
+  .modal-close{border:none;background:none;font-size:22px;line-height:1;color:var(--muted);cursor:pointer;padding:2px 6px}
+  .modal-close:hover{color:var(--red)}
+  .modal-body{padding:8px 24px 28px;overflow-y:auto}
+  .pol h3{font-size:15px;color:#2f3746;margin:22px 0 8px;padding-top:14px;border-top:1px solid var(--line)}
+  .pol h3:first-of-type{border-top:none;padding-top:0;margin-top:12px}
+  .pol h4{font-size:13.5px;color:#40485a;margin:14px 0 6px}
+  .pol p,.pol li{font-size:13px;color:#3a4250;line-height:1.7}
+  .pol ul{margin:6px 0;padding-left:20px}
+  .pol code{font-family:var(--mono);font-size:12px;background:var(--field);border:1px solid var(--line);
+    border-radius:4px;padding:1px 5px}
+  .pol table{border-collapse:collapse;width:100%;margin:8px 0;font-size:12.5px}
+  .pol th,.pol td{border:1px solid var(--line);padding:6px 9px;text-align:left;vertical-align:top}
+  .pol th{background:var(--field);font-weight:600;color:#40485a}
+  .pol .tag{display:inline-block;font-size:11px;font-weight:700;border-radius:10px;padding:1px 8px;color:#fff}
+  .pol .t-ok{background:var(--green)} .pol .t-soon{background:var(--mask,#b8860b)} .pol .t-ai{background:var(--muted)}
+  .pol .lead{background:var(--field);border:1px solid var(--line);border-radius:8px;padding:12px 14px;color:#40485a}
   @media(max-width:760px){.sidebar{display:none}}
 </style>
 </head>
@@ -121,6 +149,7 @@
 
   <div class="main">
     <div class="topbar">
+      <button class="tbtn primary" id="policyBtn" type="button" style="margin-right:auto">&#128220; 개발자 정책서</button>
       <span class="user">caprison 님 <span class="clock">03:00:00</span></span>
       <button class="tbtn">연장</button>
       <button class="tbtn">로그아웃</button>
@@ -204,6 +233,96 @@
       </p>
 
       <footer class="foot">© 2026 Toonation. All rights reserved.</footer>
+    </div>
+  </div>
+</div>
+<div id="policyModal" class="modal" hidden>
+  <div class="modal-box">
+    <div class="modal-head">
+      <span><b>개발자 정책서</b><span class="mh-sub">투네이션 비속어·음란 필터 · 규칙 기반 계층 (v1.0 · 2026-09-01)</span></span>
+      <button class="modal-close" id="policyClose" aria-label="닫기">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="pol">
+        <p class="lead">본 문서는 현재 배포된 정적 필터 콘솔(<code>index.html</code>)의 동작을 규정한다. 판정은 <b>규칙 기반(정규화 + 사전 + 정책)</b>이며 AI 분류기는 아직 포함되지 않는다. 산출물은 단일 정적 파일로 GitHub → Vercel 자동 배포된다.</p>
+
+        <h3>1. 판정 정책</h3>
+        <ul>
+          <li><b>2단계 판정: 통과 / 차단.</b> 마스킹·보류·심각도 단계는 없다.</li>
+          <li>비속어·음란 표현이 감지되면 <b>차단</b>(후원 불가·재입력 안내, 방송 미노출), 아니면 <b>통과</b>.</li>
+          <li>검사 대상: 방송에 노출·낭독되는 입력(이름·텍스트 내용). 재입력 안내 시 구체 금칙어는 노출하지 않는다(우회 학습 방지).</li>
+          <li><b>우선순위: 화이트리스트 &gt; 블랙리스트.</b> 화이트리스트/맥락 예외에 해당하는 부분은 판정 전에 제거된다.</li>
+        </ul>
+
+        <h3>2. 정규화 파이프라인 <span class="tag t-ok">구현</span></h3>
+        <p>입력을 표준형(자모 시퀀스)으로 수렴시켜 변형을 한 형태로 통일한다. 순서 고정, 규칙 기반.</p>
+        <ol>
+          <li>유니코드 정규화(NFKC) → 소문자화</li>
+          <li>유사문자·숫자 치환(<code>1→ㅣ, 0→ㅇ</code> 등) — 예: <code>시1발</code></li>
+          <li>구분자·공백·특수문자 제거 — 예: <code>시★발</code>, <code>시 발</code></li>
+          <li>영타 역변환(두벌식 자판) — 예: <code>tlqkf → 시발</code></li>
+          <li>한글 자모 분해(NFKD → 호환 자모) — 예: <code>시발 → ㅅㅣㅂㅏㄹ</code></li>
+          <li>연속 동일 자모 축약(<code>ㅋㅋㅋ→ㅋ</code>) → 허용 문자(한글 자모·영숫자)만 유지</li>
+        </ol>
+        <p>보조 키: <b>독립 초성</b>(<code>ㅅㅂ</code>), <b>음역 표준형</b>(<code>ssibal</code>).</p>
+
+        <h3>3. 매칭 채널 &amp; 최소 길이</h3>
+        <table>
+          <tr><th>채널</th><th>방식</th><th>조건</th><th>예</th></tr>
+          <tr><td>표준형 부분매칭</td><td>정규화 표준형에 블랙리스트 canon이 부분문자열로 포함</td><td>canon 길이 ≥ <code>CANON_MIN</code>(현재 <b>4</b>)</td><td>시발·자위·보지</td></tr>
+          <tr><td>초성 우회</td><td>독립 초성 런에 2음절 핵심어 초성 포함</td><td>초성 2자</td><td><code>ㅅㅂ</code></td></tr>
+          <tr><td>음역</td><td>음역 표준형 부분매칭</td><td>5자 이상</td><td><code>ssibal</code></td></tr>
+        </table>
+        <p><code>CANON_MIN</code>은 부분매칭 최소 자모 수다. 낮출수록 짧은 단어를 잡지만 정상어 오탐이 늘어 자동 화이트리스트가 커진다. 값 변경 시 <code>scripts/gen_whitelist.mjs</code>의 동일 상수도 맞추고 재생성한다.</p>
+
+        <h3>4. 사전 구성 <span class="tag t-ok">구현</span></h3>
+        <ul>
+          <li><b>블랙리스트(차단)</b>: 공개 목록 lisuugi(레벨 1~2 전 카테고리) + hlog2e를 구분 없이 병합해 기본 탑재(약 3,670개). 관리자 추가/삭제 가능.</li>
+          <li><b>수동 화이트리스트(통과)</b>: 관리자가 직접 관리하는 예외(예: <code>시발점</code>).</li>
+          <li><b>자동 화이트리스트</b>: 국어사전 명사 중 “블랙리스트 canon(≥CANON_MIN)을 부분문자열로 포함하되 그 자체는 슬러가 아닌” 정상어(현재 약 2,100개). 읽기 전용, 검색 제공.</li>
+          <li>저장/매칭: 등록 단어는 표준형으로 대조. 화이트리스트는 원문에서 먼저 제거 후 판정.</li>
+        </ul>
+
+        <h3>5. 오탐(false positive) 처리 — 3계층</h3>
+        <table>
+          <tr><th>계층</th><th>대상</th><th>동작</th></tr>
+          <tr><td>① 자동 화이트리스트(명사)</td><td>깨끗한 정상 복합어</td><td><code>시발점·자위권·눈자위</code> 등 원문에서 제거 → 통과</td></tr>
+          <tr><td>② 맥락 예외 <code>CONTEXT_SAFE</code></td><td>동음이의 동사 활용</td><td><code>보지 마세요·자지 마·자지러지다·보지 못했어요</code> 통과 / <code>보지·자지</code> 단독 차단</td></tr>
+          <tr><td>③ 우회 차단</td><td>특수문자·자모분리·숫자삽입</td><td><code>시★발·ㅅㅂ</code> 정규화+부분/초성 매칭으로 차단(화이트리스트가 새지 않음)</td></tr>
+        </table>
+        <h4>맥락 예외 규칙</h4>
+        <p>한국어 어미 <code>-지</code>는 거의 항상 <code>마/말/못/않</code>(부정 보조용언)과 결합한다. 짧은 슬러가 이 패턴 앞에 오면 동사로 간주해 그 부분만 제거한다. <code>보지·자지</code>처럼 흔한 동사형과 겹치는 소수 단어에만 적용하는 수작업 규칙이며, 새 단어는 <code>CONTEXT_SAFE</code> 맵에 <code>단어:[허용접미]</code>로 추가한다.</p>
+
+        <h3>6. 사전 관리 기능 <span class="tag t-ok">구현</span></h3>
+        <ul>
+          <li><b>입력창 = 검색 겸용</b>: 타이핑하면 실시간 검색, Enter/추가 버튼으로 추가. 입력값이 있으면 X(지우기) 버튼 노출.</li>
+          <li><b>단어별 삭제</b>(×), <b>중복 추가 방지</b>.</li>
+          <li><b>엑셀 다운로드</b>: 현재 목록 → <code>.xlsx</code>. <b>엑셀 업로드</b>: 첫 열 단어를 현재 목록에 <b>일괄 추가</b>(중복 제외). SheetJS 사용, 미로드 시 CSV 폴백.</li>
+          <li><b>자동 화이트리스트 재생성</b>: 운영자가 블랙리스트를 수정하면 “현재 블랙리스트로 재생성” 버튼으로 브라우저에서 즉시 재계산. 개수가 생성 시점과 다르면 “재생성 권장” 경고 표시. 영구 반영은 <code>node scripts/gen_whitelist.mjs</code> 후 <code>whitelist_auto.json</code> 커밋.</li>
+        </ul>
+
+        <h3>7. 데이터 출처 &amp; 라이선스</h3>
+        <table>
+          <tr><th>용도</th><th>출처</th><th>라이선스</th></tr>
+          <tr><td>블랙리스트</td><td>lisuugi/korean-profanity-filter</td><td>Apache-2.0(출처표시)</td></tr>
+          <tr><td>블랙리스트</td><td>hlog2e/bad_word_list</td><td>확인 필요</td></tr>
+          <tr><td>자동 화이트리스트(명사)</td><td>pd-korean-noun-list-for-wordles</td><td>Public Domain(표준국어대사전 표제어)</td></tr>
+        </table>
+        <p>권장: 공개 사전의 <b>특정 버전을 자사 저장소로 복사</b>해 사용(공개 저장소는 변경·삭제 가능). 정규화 로직은 재생성 스크립트가 <code>index.html</code>의 <code>normalize()</code>를 그대로 추출해 사용하므로 런타임과 100% 동일하다.</p>
+
+        <h3>8. 배포</h3>
+        <ul>
+          <li>단일 정적 파일. 빌드 없음. GitHub <code>main</code> push → Vercel 자동 프로덕션 배포.</li>
+          <li>런타임 외부 의존성(브라우저 CDN): SheetJS(xlsx), 공개 사전(jsDelivr). 자동 화이트리스트는 자사 <code>whitelist_auto.json</code>에서 로드.</li>
+        </ul>
+
+        <h3>9. 한계 &amp; 향후</h3>
+        <ul>
+          <li><span class="tag t-ai">AI</span> 동음이의 문맥(<code>존나 좋다</code> 강조 vs 욕설), <code>시이이발</code>류 음절 삽입 변형, 맥락 예외로 못 거르는 신종 우회는 규칙으로 불가 → <b>AI 분류기(KcELECTRA 등)</b> 몫. <b>자체 호스팅 소형 모델</b> 계획(후원 건당 토큰 과금 없음, 고정 인프라비).</li>
+          <li>동음이의 단독어(<code>시발</code>=始發)는 후원 맥락상 계속 차단이 타당.</li>
+          <li><span class="tag t-soon">예정</span> 후원 페이지 연동(결제·노출 이전 필터 호출), 프로덕션 백엔드(DB·API, 사전 캐시·변경 즉시 반영·차단 로그), 회원 신고제재(별도 기획).</li>
+        </ul>
+      </div>
     </div>
   </div>
 </div>
@@ -659,6 +778,15 @@ document.getElementById("wlFile").addEventListener("change",e=>{
 });
 document.getElementById("awlSearch").addEventListener("input",renderAutoWhitelist);
 document.getElementById("awlRegen").addEventListener("click",regenAuto);
+
+// 개발자 정책서 모달
+const policyModal=document.getElementById("policyModal");
+function openPolicy(){policyModal.hidden=false;}
+function closePolicy(){policyModal.hidden=true;}
+document.getElementById("policyBtn").addEventListener("click",openPolicy);
+document.getElementById("policyClose").addEventListener("click",closePolicy);
+policyModal.addEventListener("click",e=>{if(e.target===policyModal)closePolicy();});
+document.addEventListener("keydown",e=>{if(e.key==="Escape"&&!policyModal.hidden)closePolicy();});
 
 ["text"].forEach(id=>document.getElementById(id).addEventListener("input",render));
 rebuildWhitelist();
