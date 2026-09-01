@@ -505,21 +505,26 @@ document.querySelectorAll(".xbtn.dl").forEach(b=>b.onclick=()=>{
 document.querySelectorAll(".xbtn.up").forEach(b=>b.onclick=()=>{
   document.getElementById(b.dataset.list==="bl"?"blFile":"wlFile").click();
 });
-// 업로드 = 현재 리스트를 업로드한 리스트로 전체 교체
+// 업로드 = 첫 열 단어를 현재 리스트에 일괄 추가(중복 제외)
 document.getElementById("blFile").addEventListener("change",e=>{
   const f=e.target.files[0];e.target.value="";if(!f)return;
   importList(f,words=>{
-    BL_DEFAULT=[];BL_REMOVED.clear();BL_CUSTOM=words.slice();
+    let n=0;
+    for(const w of words){
+      BL_REMOVED.delete(w);
+      if(!BL_DEFAULT.includes(w)&&!BL_CUSTOM.includes(w)){BL_CUSTOM.unshift(w);n++;}
+    }
     buildLex();renderBlacklist();render();
-    alert(`블랙리스트를 업로드한 ${words.length.toLocaleString()}개 단어로 교체했습니다.`);
+    alert(`블랙리스트에 ${n.toLocaleString()}개 추가되었습니다. (현재 ${BL_WORDS.length.toLocaleString()}개)`);
   });
 });
 document.getElementById("wlFile").addEventListener("change",e=>{
   const f=e.target.files[0];e.target.value="";if(!f)return;
   importList(f,words=>{
-    WHITELIST=words.slice();
+    let n=0;
+    for(const w of words){ if(!WHITELIST.includes(w)){WHITELIST.unshift(w);n++;} }
     renderWhitelist();render();
-    alert(`화이트리스트를 업로드한 ${words.length.toLocaleString()}개 단어로 교체했습니다.`);
+    alert(`화이트리스트에 ${n.toLocaleString()}개 추가되었습니다. (현재 ${WHITELIST.length.toLocaleString()}개)`);
   });
 });
 
