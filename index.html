@@ -296,8 +296,16 @@
           <tr><td>② 맥락 예외 <code>CONTEXT_SAFE</code></td><td>동음이의 동사 활용</td><td><code>보지 마세요·자지 마·자지러지다·보지 못했어요</code> 통과 / <code>보지·자지</code> 단독 차단</td></tr>
           <tr><td>③ 우회 차단</td><td>특수문자·자모분리·숫자삽입</td><td><code>시★발·ㅅㅂ</code> 정규화+부분/초성 매칭으로 차단(화이트리스트가 새지 않음)</td></tr>
         </table>
-        <h4>맥락 예외 규칙</h4>
-        <p>한국어 어미 <code>-지</code>는 거의 항상 <code>마/말/못/않</code>(부정 보조용언)과 결합한다. 짧은 슬러가 이 패턴 앞에 오면 동사로 간주해 그 부분만 제거한다. <code>보지·자지</code>처럼 흔한 동사형과 겹치는 소수 단어에만 적용하는 수작업 규칙이며, 새 단어는 <code>CONTEXT_SAFE</code> 맵에 <code>단어:[허용접미]</code>로 추가한다.</p>
+        <h4>맥락 예외 규칙 (② 계층 상세)</h4>
+        <p class="lead"><b>⚠ 이 예외는 아래 표의 딱 2개 단어(<code>보지</code>, <code>자지</code>)에만 적용되는 특별 케이스다.</b> 다른 모든 블랙리스트 단어(시발·자위·개새끼 등 수천 개)에는 <b>적용되지 않으며</b>, 그 단어들은 예외 없이 일반 규칙(정규화 + 부분매칭)으로 그대로 차단된다.</p>
+        <p>배경: 한국어 어미 <code>-지</code>는 거의 항상 <code>마/말/못/않</code>(부정 보조용언)과 결합한다. 그래서 <code>보지</code>(보다+지)·<code>자지</code>(자다+지)는 <b>글자만 같고 뜻은 동사</b>인 경우가 흔하다. 이 두 단어에 한해, 뒤에 지정된 접미가 붙으면 동사로 간주해 그 부분만 판정 전에 제거한다.</p>
+        <table>
+          <tr><th>적용 단어</th><th>뒤에 이 글자가 오면 통과(허용 접미)</th><th>통과 예시(동사)</th><th>차단 예시(단독/슬러)</th></tr>
+          <tr><td><code>보지</code></td><td><code>마 / 말 / 못 / 않</code></td><td>보지 마세요, 보지 못했어요, 해보지 마</td><td>보지, 보지 만져, 보지 사진</td></tr>
+          <tr><td><code>자지</code></td><td><code>마 / 말 / 못 / 않 / 러</code></td><td>자지 마(잠), 자지 못했다, 자지러지다</td><td>자지, 자지 크기</td></tr>
+        </table>
+        <p><b>중요</b>: 이 두 단어는 <b>뒤에 위 접미가 붙으면 통과</b>한다. 예) <code>자지</code>만 블랙리스트에 넣어도 <code>자지마</code>는 통과(자지+마), <code>자지</code> 단독은 차단. 이는 <code>자지 마</code>(잠)·<code>자지러지다</code> 같은 정상 문장을 막지 않기 위한 <b>의도된 동작</b>이다.</p>
+        <p>이 목록은 코드의 <code>CONTEXT_SAFE</code> 맵에 하드코딩된 <b>수작업 규칙</b>이다. 단어를 추가·삭제하려면 <code>CONTEXT_SAFE</code>를 직접 수정한다(예: <code>자지</code>를 빼면 <code>자지 마</code>·<code>자지러지다</code>까지 모두 차단됨).</p>
 
         <h3>6. 사전 관리 기능 <span class="tag t-ok">구현</span></h3>
         <ul>
@@ -437,7 +445,7 @@ for 명사 W in 국어사전(표준국어대사전 명사 ~19만):
         <pre style="font-family:var(--mono);font-size:12px;background:#12151a;color:#e6edf3;border-radius:8px;padding:12px 14px;overflow-x:auto;line-height:1.7">입력 원문
  │
  ├ ① stripWhitelist    (수동+자동) 화이트리스트 단어 제거   ← 자동 화이트리스트(명사)
- ├ ② stripContextSafe  동음이의 동사형(보지+마/못, 자지+러 등) 제거  ← 맥락 예외
+ ├ ② stripContextSafe  동음이의 동사형 제거 ← 맥락 예외(보지·자지 2개 단어에만)
  ├ ③ normalize         표준형(자모 시퀀스)으로 변환  ← 우회 복원(특수문자·영타·자모분해)
  │
  └ 매칭  ④ 표준형 부분매칭 (canon 길이 ≥ CANON_MIN)
