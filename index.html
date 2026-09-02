@@ -599,9 +599,11 @@ function stripWhitelist(text){
 /* 맥락 예외(동음이의 동사형): 짧은 슬러가 정상 동사 활용으로 쓰인 경우 그 부분만 제거.
    한국어 어미 '-지'는 거의 항상 마/말/못/않(부정 보조용언)과 결합 → 이 패턴이면 동사로 간주.
    예: '보지 마세요'(보다+지), '자지 마'(자다+지), '자지러지다'(러) → 통과 / '보지' 단독 → 차단 */
+const CONTEXT_SAFE_ENABLED=false;   // 맥락 예외 사용 여부(true=적용, false=끔). 잠시 비활성화 상태.
 const CONTEXT_SAFE={ "보지":["마","말","못","않"], "자지":["마","말","못","않","러"] };
 const CONTEXT_RE=Object.entries(CONTEXT_SAFE).map(([w,sufs])=>[w,new RegExp(w+"(\\s*)("+sufs.join("|")+")","g")]);
 function stripContextSafe(text){
+  if(!CONTEXT_SAFE_ENABLED)return text||"";   // 꺼져 있으면 원문 그대로(예외 미적용)
   let t=text||"";
   for(const [w,re] of CONTEXT_RE)t=t.replace(re," $1$2");
   return t;
