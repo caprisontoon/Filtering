@@ -1,0 +1,14 @@
+# 공통(서버)
+fastapi>=0.110
+uvicorn[standard]>=0.29
+transformers>=4.40          # 토크나이저 + (torch 백엔드 시) 모델
+numpy>=1.24
+
+# 학습(train.py) — 서빙만 하고 ONNX를 쓰면 생략 가능
+torch>=2.2                  # GPU 학습 권장(무료 Colab OK)
+datasets>=2.19
+scikit-learn>=1.4           # 평가지표(f1 등)
+
+# ONNX 경량화/추론(export_onnx.py, USE_ONNX=1 서빙)
+optimum[onnxruntime]>=1.19
+onnxruntime>=1.17           # CPU 추론(양자화 int8)

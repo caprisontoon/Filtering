@@ -143,8 +143,9 @@
       <div class="sb-group active">
         <div class="sb-item">필터링 관리 <span class="chev">&#9652;</span></div>
         <div class="sb-sub">
-          <div class="s on">필터 테스트</div>
-          <div class="s">사전 관리</div>
+          <div class="s on" data-view="rule">필터 테스트</div>
+          <div class="s" data-view="rule">사전 관리</div>
+          <div class="s" data-view="ai">AI 필터 <span style="opacity:.7">(베타)</span></div>
         </div>
       </div>
       <div class="sb-group"><div class="sb-item">기프티콘 관리 <span class="chev">&#9662;</span></div></div>
@@ -168,6 +169,7 @@
         <p class="sub2">비속어·음란 필터 테스트 및 사전 관리</p>
       </div>
 
+      <div id="ruleView">
       <section class="acard">
         <h2 class="acard-h">필터 테스트</h2>
         <div class="field">
@@ -236,6 +238,53 @@
         <b>이 화면은 규칙 기반 계층까지만 재현합니다.</b> 정규화(변형 복원)·사전 매칭이 실제 로직과 동일하게 동작하며, 판정은 통과/차단 2단계입니다.
         사전에 없는 신종 변형은 사전·규칙 보강으로 대응하며, 문맥 판단(강조의 '존나 좋다' vs 욕설 등)은 규칙 기반의 구조적 한계로 본 시스템 범위 밖입니다.
       </p>
+      </div><!-- /#ruleView -->
+
+      <section id="aiView" class="acard" hidden>
+        <h2 class="acard-h">AI 필터 (베타) <span class="src-sub" style="font-weight:400">· 문맥 기반 판정 (규칙 + KcELECTRA)</span></h2>
+
+        <div class="srcbox" style="background:var(--field);border:1px solid var(--line);border-radius:8px;padding:12px 14px;margin-bottom:14px">
+          <div class="sub-h" style="margin:0 0 8px">AI 서버 연결</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+            <input id="aiApi" type="text" placeholder="AI API 주소 (예: https://내서버/api/ai-filter)" autocomplete="off" style="flex:1;min-width:220px">
+            <button class="add" id="aiSave" type="button">저장</button>
+            <button class="xbtn gen" id="aiPing" type="button">연결 확인</button>
+          </div>
+          <div id="aiConn" class="src-sub" style="margin-top:8px">미연결 · 백엔드 배포 후 주소를 입력하세요</div>
+        </div>
+
+        <div class="field">
+          <label>텍스트 내용 <span class="hint">· 후원 메시지</span></label>
+          <textarea id="aiText" rows="3" placeholder="예) 오늘 방송 존나 웃겼다"></textarea>
+        </div>
+
+        <div class="field" style="margin-top:6px">
+          <label>차단 임계값 <span class="hint">· 높을수록 더 관대(통과↑) · 명백한 것만 차단</span> <b id="aiThVal" style="color:var(--blue)">0.90</b></label>
+          <input id="aiTh" type="range" min="0.50" max="0.99" step="0.01" value="0.90" style="width:100%">
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;margin:4px 0 14px">
+          <button class="add" id="aiRun" type="button">AI 검사</button>
+          <span id="aiBusy" class="src-sub"></span>
+        </div>
+
+        <div id="aiOverall" class="overall">
+          <span class="dot d-allow"></span>
+          <div><div class="otxt">&mdash;</div><div class="odesc">입력을 기다리는 중</div></div>
+        </div>
+        <div id="aiDetail" class="norm" hidden>
+          <div class="nt">클래스별 확률 (K-HATERS 4분류)</div>
+          <div class="nrow"><span class="nk">Normal</span><span id="aip_normal" class="nv">—</span></div>
+          <div class="nrow"><span class="nk">Offensive</span><span id="aip_off" class="nv">—</span></div>
+          <div class="nrow"><span class="nk">L1_hate</span><span id="aip_l1" class="nv">—</span></div>
+          <div class="nrow"><span class="nk">L2_hate</span><span id="aip_l2" class="nv">—</span></div>
+          <div class="nrow"><span class="nk">차단점수(p_bad)</span><span id="aip_bad" class="nv">—</span></div>
+        </div>
+
+        <p class="note" style="margin-top:16px">
+          <b>베타 안내.</b> 이 탭은 규칙(정규식)으로 명백한 우회를 먼저 거르고, 그 외는 <b>KcELECTRA(K-HATERS 학습)</b> 문맥 판정으로 통과/차단합니다.
+          판정은 <b>AI 서버(백엔드)</b>가 수행하며, 서버 미배포 시 이 탭만 동작하지 않습니다(규칙 기반 화면은 정상). 임계값은 슬라이더로 즉시 조정됩니다.
+        </p>
+      </section>
 
       <footer class="foot">© 2026 Toonation. All rights reserved.</footer>
     </div>
@@ -948,6 +997,73 @@ function dlFromUrl(url,name,btn){
     .finally(()=>{btn.disabled=false;btn.textContent=old;});
 }
 document.querySelectorAll(".pol .dlbtn").forEach(b=>b.addEventListener("click",()=>dlFromUrl(b.dataset.url,b.dataset.name,b)));
+
+// ── 사이드바 뷰 전환: 규칙 화면(ruleView) / AI 필터 베타(aiView) ──
+(function(){
+  const ruleView=document.getElementById("ruleView"), aiView=document.getElementById("aiView");
+  const subs=document.querySelectorAll(".sb-sub .s");
+  subs.forEach(s=>s.addEventListener("click",()=>{
+    subs.forEach(x=>x.classList.remove("on")); s.classList.add("on");
+    const ai=s.dataset.view==="ai"; aiView.hidden=!ai; ruleView.hidden=ai;
+    window.scrollTo(0,0);
+  }));
+})();
+
+// ── AI 필터(베타): 백엔드 API 연동 (없어도 기존 기능 무해) ──
+(function(){
+  const $=id=>document.getElementById(id);
+  if(!$("aiView"))return;
+  const LS="tnf_ai_api";
+  let apiBase=""; try{ apiBase=localStorage.getItem(LS)||""; }catch(e){}
+  if(apiBase)$("aiApi").value=apiBase;
+  const th=$("aiTh");
+  function setConn(msg,color){ const el=$("aiConn"); el.textContent=msg; el.style.color=color||"var(--muted)"; }
+  if(apiBase)setConn("저장된 주소: "+apiBase);
+  const pct=x=>(x*100).toFixed(1)+"%";
+  let lastProbs=null;
+
+  function applyVerdict(){
+    if(!lastProbs)return;
+    const p=lastProbs, p_bad=1-(p.normal||0), T=+th.value;
+    const block=(p.l2_hate||0)>=0.70 || p_bad>=T;
+    $("aiOverall").innerHTML=block
+      ? `<span class="dot d-block"></span><div><div class="otxt" style="color:var(--red)">차단</div><div class="odesc">AI 문맥 판정 · 차단점수 ${pct(p_bad)} ≥ 기준 ${T.toFixed(2)}${(p.l2_hate||0)>=0.7?" · 명시 혐오":""}</div></div>`
+      : `<span class="dot d-allow"></span><div><div class="otxt" style="color:var(--green)">통과</div><div class="odesc">AI 문맥 판정 · 차단점수 ${pct(p_bad)} &lt; 기준 ${T.toFixed(2)}</div></div>`;
+    $("aip_normal").textContent=pct(p.normal||0);
+    $("aip_off").textContent=pct(p.offensive||0);
+    $("aip_l1").textContent=pct(p.l1_hate||0);
+    $("aip_l2").textContent=pct(p.l2_hate||0);
+    $("aip_bad").textContent=pct(p_bad);
+    $("aiDetail").hidden=false;
+  }
+  th.addEventListener("input",()=>{ $("aiThVal").textContent=(+th.value).toFixed(2); applyVerdict(); });
+
+  $("aiSave").onclick=()=>{
+    apiBase=$("aiApi").value.trim();
+    try{ localStorage.setItem(LS,apiBase); }catch(e){}
+    setConn(apiBase?("저장됨: "+apiBase):"주소가 비어 있습니다", apiBase?"var(--green)":"var(--red)");
+  };
+  $("aiPing").onclick=()=>{
+    const base=$("aiApi").value.trim();
+    if(!base){ setConn("주소를 입력하세요","var(--red)"); return; }
+    setConn("확인 중…");
+    fetch(base,{method:"GET"}).then(r=>setConn(r.ok?"연결 OK":("서버 응답 "+r.status+" (POST 전용일 수 있음)"), r.ok?"var(--green)":"var(--mask)"))
+      .catch(()=>setConn("연결 실패 · 주소/CORS/서버 확인","var(--red)"));
+  };
+  $("aiRun").onclick=()=>{
+    const base=$("aiApi").value.trim(), text=$("aiText").value;
+    if(!base){ setConn("먼저 AI API 주소를 입력·저장하세요","var(--red)"); return; }
+    if(!text.trim())return;
+    $("aiBusy").textContent="검사 중…";
+    fetch(base,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({text})})
+      .then(r=>{ if(!r.ok)throw new Error("HTTP "+r.status); return r.json(); })
+      .then(d=>{ const p=d.probs||d;
+        lastProbs={normal:+p.normal||0,offensive:+p.offensive||0,l1_hate:+p.l1_hate||0,l2_hate:+p.l2_hate||0};
+        applyVerdict(); setConn("연결 OK","var(--green)"); })
+      .catch(e=>setConn("검사 실패: "+e.message+" · 주소/CORS/서버 확인","var(--red)"))
+      .finally(()=>{ $("aiBusy").textContent=""; });
+  };
+})();
 
 ["text"].forEach(id=>document.getElementById(id).addEventListener("input",render));
 rebuildWhitelist();

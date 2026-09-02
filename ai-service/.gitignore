@@ -1,0 +1,7 @@
+# 학습/양자화 산출물(대용량) — 저장소에 커밋하지 않음
+model/
+model_onnx/
+__pycache__/
+*.onnx
+*.bin
+*.safetensors
