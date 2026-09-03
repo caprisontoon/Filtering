@@ -1,0 +1,5 @@
+# Streamlit Community Cloud용 (CPU 전용 torch로 설치 용량·메모리 절감)
+--extra-index-url https://download.pytorch.org/whl/cpu
+streamlit>=1.36
+transformers>=4.40
+torch==2.2.2+cpu
