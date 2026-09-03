@@ -1,0 +1,10 @@
+text,label,severity,target,evasion
+오늘 방송 존나 웃겼다,normal,,,
+방송 보지 못했어요,normal,,,
+시발점에서 만나요,normal,,,
+오늘도 화이팅 응원할게요,normal,,,
+씨발 꺼져,offensive,strong,individual,false
+스트리머 병신 아니냐,offensive,strong,individual,false
+ㅅㅂ,offensive,mild,,true
+시★발,offensive,strong,,true
+(집단 비하 예시 문장을 여기에),hate,strong,group,false
