@@ -1,5 +1,6 @@
-# Streamlit Community Cloud용 (CPU 전용 torch로 설치 용량·메모리 절감)
+# Streamlit Community Cloud용
+# torch는 버전을 고정하지 않고, CPU 전용 인덱스에서 현재 파이썬에 맞는 +cpu 휠을 자동 선택
 --extra-index-url https://download.pytorch.org/whl/cpu
 streamlit>=1.36
 transformers>=4.40
-torch==2.2.2+cpu
+torch
